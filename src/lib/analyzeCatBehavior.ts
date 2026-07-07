@@ -15,6 +15,10 @@ export type CatBehaviorAnalysisInput = {
   };
 };
 
+export type CatMediaAIInput = CatBehaviorAnalysisInput & {
+  file: File;
+};
+
 export type CatBehaviorAnalysisResult = {
   primaryMood: string;
   possibleIntent: string;
@@ -25,6 +29,8 @@ export type CatBehaviorAnalysisResult = {
   observationTips: string[];
   riskNotice: string;
   resultText: string;
+  source?: "vision_ai" | "rule_engine";
+  visualObservations?: string[];
 };
 
 type ScoredRule = {
@@ -107,6 +113,7 @@ export function analyzeCatBehavior(input: CatBehaviorAnalysisInput): CatBehavior
       observationTips: ["可以观察耳朵方向、尾巴速度、是否主动靠近、叫声类型和是否愿意被摸。"],
       riskNotice,
       resultText: `还需要更多线索哦。上传媒体后，请选择你观察到的 ${catName} 的行为特征，Mewly 才能更准确地分析它现在可能想表达什么。`,
+      source: "rule_engine",
     };
   }
 
@@ -167,10 +174,118 @@ export function analyzeCatBehavior(input: CatBehaviorAnalysisInput): CatBehavior
     observationTips,
     riskNotice,
     resultText: `${catName}现在可能是「${best.rule.mood}」。你选择了 ${allTags.slice(0, 6).join("、")} 等线索，Mewly 推测它${best.rule.intent}。${best.rule.suggestion}`,
+    source: "rule_engine",
   };
 }
 
-export async function analyzeCatMediaWithAI(_file: File) {
-  // TODO: 后续接入视觉模型 / 音频模型，自动识别图片、视频或叫声特征。
-  return null;
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("图片读取失败，请换一张更清晰的照片。"));
+    image.src = src;
+  });
+}
+
+function canvasToJpegDataUrl(source: CanvasImageSource, width: number, height: number) {
+  const maxSide = 980;
+  const scale = Math.min(1, maxSide / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("当前浏览器无法处理图片。");
+  context.drawImage(source, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.78);
+}
+
+async function imageFileToDataUrl(file: File) {
+  const raw = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("图片读取失败，请重新选择。"));
+    reader.readAsDataURL(file);
+  });
+  const image = await loadImage(raw);
+  return canvasToJpegDataUrl(image, image.naturalWidth || image.width, image.naturalHeight || image.height);
+}
+
+function waitForVideoEvent(video: HTMLVideoElement, eventName: "loadedmetadata" | "seeked") {
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      video.removeEventListener(eventName, onReady);
+      video.removeEventListener("error", onError);
+    };
+    const onReady = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error("视频读取失败，请换一段更短或更清晰的视频。"));
+    };
+    video.addEventListener(eventName, onReady, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  });
+}
+
+async function videoFileToFrameDataUrls(file: File) {
+  const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.src = objectUrl;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+  try {
+    await waitForVideoEvent(video, "loadedmetadata");
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
+    const times = [...new Set([0.15, duration * 0.5, Math.max(0.15, duration - 0.25)].map((time) => Math.min(duration - 0.05, Math.max(0.05, time)).toFixed(2)))].map(Number);
+    const frames: string[] = [];
+    for (const time of times.slice(0, 3)) {
+      video.currentTime = time;
+      await waitForVideoEvent(video, "seeked");
+      frames.push(canvasToJpegDataUrl(video, video.videoWidth || 720, video.videoHeight || 720));
+    }
+    return frames;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function normalizeRemoteResult(result: Partial<CatBehaviorAnalysisResult>): CatBehaviorAnalysisResult {
+  return {
+    primaryMood: result.primaryMood || "待观察",
+    possibleIntent: result.possibleIntent || "需要结合更多画面线索判断",
+    confidence: Math.max(30, Math.min(95, Number(result.confidence) || 62)),
+    matchedRules: Array.isArray(result.matchedRules) ? result.matchedRules.slice(0, 5) : [],
+    reasons: Array.isArray(result.reasons) && result.reasons.length ? result.reasons.slice(0, 6) : ["已根据上传画面进行视觉观察，但可见线索有限。"],
+    suggestions: Array.isArray(result.suggestions) && result.suggestions.length ? result.suggestions.slice(0, 6) : ["建议补充更清晰的猫咪正面、尾巴或身体姿态画面。"],
+    observationTips: Array.isArray(result.observationTips) && result.observationTips.length ? result.observationTips.slice(0, 5) : ["继续观察耳朵、尾巴、身体姿态和是否愿意互动。"],
+    riskNotice: result.riskNotice || riskNotice,
+    resultText: result.resultText || "Mewly 已基于上传画面做了轻量视觉分析，请结合宝宝平时习惯继续观察。",
+    source: "vision_ai",
+    visualObservations: Array.isArray(result.visualObservations) ? result.visualObservations.slice(0, 6) : [],
+  };
+}
+
+export async function analyzeCatMediaWithAI(input: CatMediaAIInput): Promise<CatBehaviorAnalysisResult> {
+  const { file, ...metadata } = input;
+  if (file.type.startsWith("audio")) {
+    throw new Error("音频自动识别还没有接入。请先选择声音标签辅助分析，或上传照片/视频做视觉分析。");
+  }
+  const imageDataUrls = file.type.startsWith("video") ? await videoFileToFrameDataUrls(file) : [await imageFileToDataUrl(file)];
+  const response = await fetch("/api/analyze-media", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...metadata,
+      mediaType: file.type.startsWith("video") ? "video" : "image",
+      imageDataUrls,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.message || "视觉 AI 分析暂时不可用，请稍后再试。");
+  }
+  return normalizeRemoteResult(payload.result || payload);
 }

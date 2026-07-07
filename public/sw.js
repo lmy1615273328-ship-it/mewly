@@ -1,4 +1,4 @@
-const CACHE_NAME = "mewly-beta-v3";
+const CACHE_NAME = "mewly-beta-v4";
 const APP_SHELL = ["/", "/manifest.json", "/manifest.webmanifest", "/pwa-icon.svg"];
 
 self.addEventListener("install", (event) => {

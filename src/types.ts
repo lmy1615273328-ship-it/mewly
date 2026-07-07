@@ -156,4 +156,4 @@ export const HEALTH_DISCLAIMER =
 export type Language = "zh-CN" | "en";
 
 export const APP_NAME = "Mewly";
-export const APP_VERSION = "0.2.1-beta";
+export const APP_VERSION = "0.3.0-beta";

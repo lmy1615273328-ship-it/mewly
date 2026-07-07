@@ -7,6 +7,7 @@ Mewly 是一个移动端优先的 React / TypeScript PWA。当前 Beta 版本可
 - 支持手机浏览器访问。
 - 支持添加到手机主屏幕，PWA 名称为 `Mewly`。
 - 支持注册 / 登录、猫咪资料、首页状态总览、猫咪行为分析、相册、咪记事、喵圈、流浪猫地图解锁流程。
+- 猫咪行为分析支持“上传照片 / 视频关键帧 + 视觉 AI 分析”。用户选择的标签只作为辅助上下文。
 - 数据使用本机 `localStorage`，朋友打开链接后会在自己的设备上生成独立数据。
 - 已配置 Capacitor，后续可以打包 Android / iOS。
 
@@ -18,6 +19,7 @@ Mewly 是一个移动端优先的 React / TypeScript PWA。当前 Beta 版本可
 - 不同用户之间暂时不能同步数据。
 - 论坛、评论、上传图片目前是本地 mock 体验，朋友之间看不到彼此发布的内容。
 - 如果要真实共享论坛、评论、图片、用户资料，需要接 Supabase、Firebase 或自建后端。
+- 照片 / 视频分析需要服务端环境变量 `OPENAI_API_KEY`。如果没有配置，页面会明确提示“还没有配置视觉 AI”，不会假装分析上传内容。
 
 ## 本地运行
 
@@ -65,7 +67,17 @@ npm run preview
    ```text
    dist
    ```
-7. 部署完成后，把 Vercel 生成的 HTTPS 链接发给朋友。
+7. 在 Vercel Project Settings > Environment Variables 中添加：
+   ```text
+   OPENAI_API_KEY=你的 OpenAI API Key
+   ```
+   可选模型变量：
+   ```text
+   OPENAI_VISION_MODEL=gpt-4.1-mini
+   ```
+8. 重新部署后，把 Vercel 生成的 HTTPS 链接发给朋友。
+
+注意：当前真正的照片 / 视频视觉分析接口使用 Vercel Serverless Function：`/api/analyze-media`。如果部署到 Netlify 或 Cloudflare Pages，需要另外改成对应平台的 Functions / Workers，否则只能使用行为标签辅助分析。
 
 方式二：Vercel CLI
 

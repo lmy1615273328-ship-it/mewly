@@ -355,6 +355,18 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
     if (last) window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   }, [last]);
 
+  function resetAnalysis() {
+    setPreview("");
+    setFile(null);
+    setSceneTags([]);
+    setBehaviorTags([]);
+    setSoundTags([]);
+    setInteractionTags([]);
+    setLast(null);
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function choose(nextFile: File) {
     setError("");
     setFile(nextFile);
@@ -363,8 +375,12 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
 
   async function analyze() {
     const selectedCount = sceneTags.length + behaviorTags.length + soundTags.length + interactionTags.length;
-    if (selectedCount === 0) {
-      setError("请至少选择一个场景、行为、声音或互动标签，这样 Mewly 才能推理宝宝想表达什么。");
+    if (!file && selectedCount === 0) {
+      setError("请先上传猫咪照片或视频；如果暂时不上传，请至少选择一个行为标签做本地规则分析。");
+      return;
+    }
+    if (file?.type.startsWith("audio") && selectedCount === 0) {
+      setError("音频自动识别还在预留中，请先选择声音标签辅助分析。");
       return;
     }
     try {
@@ -377,8 +393,7 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
             ? "audio"
             : "image"
         : "manual";
-      if (file) await analyzeCatMediaWithAI(file);
-      const behaviorResult = analyzeCatBehavior({
+      const input = {
         mediaType: type,
         sceneTags,
         behaviorTags,
@@ -391,7 +406,8 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
           gender: data.cat?.gender,
           personalityTags: data.cat?.personalityTags,
         },
-      });
+      };
+      const behaviorResult = file && !file.type.startsWith("audio") ? await analyzeCatMediaWithAI({ ...input, file }) : analyzeCatBehavior(input);
       const allSelectedTags = [...sceneTags, ...behaviorTags, ...soundTags, ...interactionTags];
       const storageSafePreview = preview.length < 450000 ? preview : "";
       const analysis: MediaAnalysis = {
@@ -438,10 +454,17 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
     <section className="result-card insight-result-card" ref={savedOnly ? undefined : resultRef}>
       <div className="result-head">
         <span className="eyebrow">{savedOnly ? "最近一次分析" : copy.insight.result}</span>
-        {!savedOnly && <button className="ghost-button tiny" onClick={() => setLast(null)}>重新分析</button>}
+        {!savedOnly && <button className="ghost-button tiny" onClick={resetAnalysis}>再次分析</button>}
       </div>
+      {!savedOnly && <p className="source-pill">{result.source === "vision_ai" ? "基于上传画面分析" : "基于行为标签辅助分析"}</p>}
       <h2>{result.primaryMood}</h2>
       <p>{result.possibleIntent} · 置信度 {result.confidence}%</p>
+      {!!result.visualObservations?.length && (
+        <>
+          <h4>画面观察</h4>
+          <ul>{result.visualObservations.map((item) => <li key={item}>{item}</li>)}</ul>
+        </>
+      )}
       {!savedOnly && !!selectedTags.length && (
         <div className="tag-row">
           {selectedTags.slice(0, 8).map((tag) => <span className="mini-tag" key={tag}>{tag}</span>)}
@@ -464,6 +487,10 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
     <div className="stack-page insight-page">
       <PageHeader title={copy.insight.title} subtitle={copy.insight.subtitle} />
       {last && renderResult(last)}
+      {last ? (
+        <Disclaimer />
+      ) : (
+        <>
       <section className="soft-card">
         <span className="eyebrow">上传区域</span>
         <p>上传猫咪照片、视频或音频，Mewly 会帮你分析宝宝现在可能想表达什么。</p>
@@ -475,11 +502,11 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
       </section>
       <UploadPreview accept="image/*,video/*,audio/*" preview={preview} onFile={choose} />
       {preview ? (
-        <p className="notice">已上传成功。为了让分析更准确，请选择你观察到的猫咪行为特征。当前不会假装自动识别媒体内容。</p>
+        <p className="notice">已上传成功。照片/视频会优先进入视觉 AI 分析；你选择的标签只作为辅助参考。音频目前请配合声音标签分析。</p>
       ) : (
         <EmptyState
-          title="可以先不上传，直接选择行为特征"
-          text="上传媒体会方便回看；如果现在只想分析，也可以直接选择场景、耳朵、尾巴、声音等标签，Mewly 会根据本地猫咪行为知识库推理。"
+          title="先上传猫咪照片或视频"
+          text="Mewly 会优先根据你上传的画面分析宝宝的姿态和可能情绪；行为标签只作为辅助参考。"
           action={<div className="empty-actions">{renderUploadButton("上传图片", "image/*")}{renderUploadButton("上传视频", "video/*")}{renderUploadButton("上传音频", "audio/*")}</div>}
         />
       )}
@@ -515,6 +542,8 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
           <h3>{latestSaved.resultMood}</h3>
           <p>{latestSaved.resultIntent} · 置信度 {latestSaved.confidence}%</p>
         </section>
+      )}
+        </>
       )}
     </div>
   );
