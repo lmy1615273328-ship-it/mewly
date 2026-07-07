@@ -1,4 +1,4 @@
-const CACHE_NAME = "mewly-beta-v1";
+const CACHE_NAME = "mewly-beta-v3";
 const APP_SHELL = ["/", "/manifest.json", "/manifest.webmanifest", "/pwa-icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -17,5 +17,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))));
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),
+  );
 });

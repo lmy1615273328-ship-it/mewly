@@ -347,61 +347,70 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
   const [soundTags, setSoundTags] = useState<string[]>([]);
   const [interactionTags, setInteractionTags] = useState<string[]>([]);
   const [last, setLast] = useState<CatBehaviorAnalysisResult | null>(null);
+  const [error, setError] = useState("");
   const latestSaved = data.analyses[0] || null;
 
   async function choose(nextFile: File) {
+    setError("");
     setFile(nextFile);
     setPreview(await fileToDataUrl(nextFile));
   }
 
   async function analyze() {
     const selectedCount = sceneTags.length + behaviorTags.length + soundTags.length + interactionTags.length;
-    if (!file || !preview) {
-      alert("请先上传猫咪照片、视频或音频。上传后再选择你观察到的行为特征。");
-      return;
-    }
     if (selectedCount === 0) {
-      alert("请至少选择一个场景、行为、声音或互动标签，这样 Mewly 才能推理宝宝想表达什么。");
+      setError("请至少选择一个场景、行为、声音或互动标签，这样 Mewly 才能推理宝宝想表达什么。");
       return;
     }
-    setLoading(true);
-    const type: MediaType = file.type.startsWith("video") ? "video" : file.type.startsWith("audio") ? "audio" : "image";
-    await analyzeCatMediaWithAI(file);
-    const behaviorResult = analyzeCatBehavior({
-      mediaType: type,
-      sceneTags,
-      behaviorTags,
-      soundTags,
-      interactionTags,
-      catProfile: {
-        name: data.cat?.name,
-        age: data.cat?.age,
-        breed: data.cat?.breed,
-        gender: data.cat?.gender,
-        personalityTags: data.cat?.personalityTags,
-      },
-    });
-    const allSelectedTags = [...sceneTags, ...behaviorTags, ...soundTags, ...interactionTags];
-    const analysis: MediaAnalysis = {
-      id: makeId("analysis"),
-      userId: data.user!.id,
-      catId: data.cat!.id,
-      mediaType: type,
-      fileUrl: preview,
-      selectedBehaviorTags: allSelectedTags,
-      resultMood: behaviorResult.primaryMood,
-      resultIntent: behaviorResult.possibleIntent,
-      confidence: behaviorResult.confidence,
-      reasons: behaviorResult.reasons,
-      suggestions: [...behaviorResult.suggestions, ...behaviorResult.observationTips],
-      riskNotice: behaviorResult.riskNotice,
-      createdAt: nowIso(),
-    };
-    window.setTimeout(() => {
+    try {
+      setError("");
+      setLoading(true);
+      const type: MediaType = file
+        ? file.type.startsWith("video")
+          ? "video"
+          : file.type.startsWith("audio")
+            ? "audio"
+            : "image"
+        : "manual";
+      if (file) await analyzeCatMediaWithAI(file);
+      const behaviorResult = analyzeCatBehavior({
+        mediaType: type,
+        sceneTags,
+        behaviorTags,
+        soundTags,
+        interactionTags,
+        catProfile: {
+          name: data.cat?.name,
+          age: data.cat?.age,
+          breed: data.cat?.breed,
+          gender: data.cat?.gender,
+          personalityTags: data.cat?.personalityTags,
+        },
+      });
+      const allSelectedTags = [...sceneTags, ...behaviorTags, ...soundTags, ...interactionTags];
+      const analysis: MediaAnalysis = {
+        id: makeId("analysis"),
+        userId: data.user!.id,
+        catId: data.cat!.id,
+        mediaType: type,
+        fileUrl: preview,
+        selectedBehaviorTags: allSelectedTags,
+        resultMood: behaviorResult.primaryMood,
+        resultIntent: behaviorResult.possibleIntent,
+        confidence: behaviorResult.confidence,
+        reasons: behaviorResult.reasons,
+        suggestions: [...behaviorResult.suggestions, ...behaviorResult.observationTips],
+        riskNotice: behaviorResult.riskNotice,
+        createdAt: nowIso(),
+      };
       setLast(behaviorResult);
       onSave(analysis);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "分析时遇到一点小问题，请稍后再试。";
+      setError(message);
+    } finally {
       setLoading(false);
-    }, 450);
+    }
   }
 
   const renderUploadButton = (label: string, accept: string) => (
@@ -435,8 +444,8 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
         <p className="notice">已上传成功。为了让分析更准确，请选择你观察到的猫咪行为特征。当前不会假装自动识别媒体内容。</p>
       ) : (
         <EmptyState
-          title="还没有上传猫咪瞬间"
-          text="上传猫咪照片、视频或音频，Mewly 会结合你选择的场景和行为标签做可解释分析。"
+          title="可以先不上传，直接选择行为特征"
+          text="上传媒体会方便回看；如果现在只想分析，也可以直接选择场景、耳朵、尾巴、声音等标签，Mewly 会根据本地猫咪行为知识库推理。"
           action={<div className="empty-actions">{renderUploadButton("上传图片", "image/*")}{renderUploadButton("上传视频", "video/*")}{renderUploadButton("上传音频", "audio/*")}</div>}
         />
       )}
@@ -463,6 +472,7 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
             </section>
           );
         })}
+        {error && <p className="inline-error">{error}</p>}
         <button className="primary-button" disabled={loading} onClick={analyze}>{loading ? "分析中..." : copy.insight.start}</button>
       </section>
       {last && (

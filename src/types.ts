@@ -1,7 +1,7 @@
 export type Gender = "妹妹" | "弟弟" | "未知";
 export type Severity = "轻微" | "中等" | "严重";
 export type RiskLevel = "正常" | "需观察" | "建议咨询兽医" | "尽快就医";
-export type MediaType = "image" | "video" | "audio";
+export type MediaType = "image" | "video" | "audio" | "manual";
 
 export interface User {
   id: string;
@@ -55,7 +55,7 @@ export interface AlbumItem {
   id: string;
   userId: string;
   catId: string;
-  mediaType: Exclude<MediaType, "audio">;
+  mediaType: "image" | "video";
   fileUrl: string;
   tags: string[];
   note: string;
@@ -156,4 +156,4 @@ export const HEALTH_DISCLAIMER =
 export type Language = "zh-CN" | "en";
 
 export const APP_NAME = "Mewly";
-export const APP_VERSION = "0.2.0-beta";
+export const APP_VERSION = "0.2.1-beta";

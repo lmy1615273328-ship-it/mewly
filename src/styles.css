@@ -659,6 +659,16 @@ ul {
   margin: 0;
 }
 
+.inline-error {
+  border-radius: 16px;
+  background: #fff0f3;
+  border: 1px solid #ffd6e0;
+  color: #9c4554;
+  padding: 11px 12px;
+  line-height: 1.55;
+  margin: 0;
+}
+
 .album-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
