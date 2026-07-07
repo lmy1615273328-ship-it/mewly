@@ -87,7 +87,11 @@ export function loadData(): AppData {
 }
 
 export function saveData(data: AppData) {
-  localStorage.setItem(KEY, JSON.stringify(data));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(data));
+  } catch (error) {
+    console.warn("Mewly local save skipped", error);
+  }
 }
 
 export function fileToDataUrl(file: File): Promise<string> {

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlbumTile,
   CatCard,
@@ -348,7 +348,12 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
   const [interactionTags, setInteractionTags] = useState<string[]>([]);
   const [last, setLast] = useState<CatBehaviorAnalysisResult | null>(null);
   const [error, setError] = useState("");
+  const resultRef = useRef<HTMLElement | null>(null);
   const latestSaved = data.analyses[0] || null;
+
+  useEffect(() => {
+    if (last) window.setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }, [last]);
 
   async function choose(nextFile: File) {
     setError("");
@@ -388,12 +393,13 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
         },
       });
       const allSelectedTags = [...sceneTags, ...behaviorTags, ...soundTags, ...interactionTags];
+      const storageSafePreview = preview.length < 450000 ? preview : "";
       const analysis: MediaAnalysis = {
         id: makeId("analysis"),
         userId: data.user!.id,
         catId: data.cat!.id,
         mediaType: type,
-        fileUrl: preview,
+        fileUrl: storageSafePreview,
         selectedBehaviorTags: allSelectedTags,
         resultMood: behaviorResult.primaryMood,
         resultIntent: behaviorResult.possibleIntent,
@@ -427,9 +433,37 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
     </label>
   );
 
+  const selectedTags = [...sceneTags, ...behaviorTags, ...soundTags, ...interactionTags];
+  const renderResult = (result: CatBehaviorAnalysisResult, savedOnly = false) => (
+    <section className="result-card insight-result-card" ref={savedOnly ? undefined : resultRef}>
+      <div className="result-head">
+        <span className="eyebrow">{savedOnly ? "最近一次分析" : copy.insight.result}</span>
+        {!savedOnly && <button className="ghost-button tiny" onClick={() => setLast(null)}>重新分析</button>}
+      </div>
+      <h2>{result.primaryMood}</h2>
+      <p>{result.possibleIntent} · 置信度 {result.confidence}%</p>
+      {!savedOnly && !!selectedTags.length && (
+        <div className="tag-row">
+          {selectedTags.slice(0, 8).map((tag) => <span className="mini-tag" key={tag}>{tag}</span>)}
+        </div>
+      )}
+      <p className="result-text">{result.resultText}</p>
+      <h4>命中的行为知识</h4>
+      {result.matchedRules.length ? <ul>{result.matchedRules.map((rule) => <li key={rule}>{rule}</li>)}</ul> : <p>本次是轻量推测，建议再补充 2-3 个行为标签让结果更准。</p>}
+      <h4>{copy.insight.reasons}</h4>
+      <ul>{result.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+      <h4>铲屎官可以怎么做</h4>
+      <ul>{result.suggestions.map((s) => <li key={s}>{s}</li>)}</ul>
+      <h4>需要继续观察</h4>
+      <ul>{result.observationTips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
+      <p className="disclaimer">{result.riskNotice}</p>
+    </section>
+  );
+
   return (
     <div className="stack-page insight-page">
       <PageHeader title={copy.insight.title} subtitle={copy.insight.subtitle} />
+      {last && renderResult(last)}
       <section className="soft-card">
         <span className="eyebrow">上传区域</span>
         <p>上传猫咪照片、视频或音频，Mewly 会帮你分析宝宝现在可能想表达什么。</p>
@@ -475,23 +509,6 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
         {error && <p className="inline-error">{error}</p>}
         <button className="primary-button" disabled={loading} onClick={analyze}>{loading ? "分析中..." : copy.insight.start}</button>
       </section>
-      {last && (
-        <section className="result-card">
-          <span className="eyebrow">{copy.insight.result}</span>
-          <h2>{last.primaryMood}</h2>
-          <p>{last.possibleIntent} · 置信度 {last.confidence}%</p>
-          <p className="result-text">{last.resultText}</p>
-          <h4>命中的行为知识</h4>
-          <ul>{last.matchedRules.map((rule) => <li key={rule}>{rule}</li>)}</ul>
-          <h4>{copy.insight.reasons}</h4>
-          <ul>{last.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
-          <h4>铲屎官可以怎么做</h4>
-          <ul>{last.suggestions.map((s) => <li key={s}>{s}</li>)}</ul>
-          <h4>需要继续观察</h4>
-          <ul>{last.observationTips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
-          <p className="disclaimer">{last.riskNotice}</p>
-        </section>
-      )}
       {!last && latestSaved && (
         <section className="soft-card">
           <span className="eyebrow">最近一次分析</span>
