@@ -1,0 +1,11 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="44" fill="#FFFDF9"/>
+  <circle cx="96" cy="104" r="54" fill="#FFB86C"/>
+  <path d="M56 65 70 30l22 34M136 65l-14-35-22 34" fill="#FFB86C"/>
+  <circle cx="77" cy="102" r="6" fill="#4E3B35"/>
+  <circle cx="115" cy="102" r="6" fill="#4E3B35"/>
+  <path d="M94 115h4l-2 3-2-3Z" fill="#FF9FB1"/>
+  <path d="M83 124c8 8 18 8 26 0" stroke="#4E3B35" stroke-width="5" stroke-linecap="round"/>
+  <path d="M54 116c-12-3-21-8-28-15M138 116c12-3 21-8 28-15" stroke="#8A746B" stroke-width="5" stroke-linecap="round"/>
+  <text x="96" y="165" text-anchor="middle" font-family="Arial Rounded MT Bold, Arial, sans-serif" font-size="24" fill="#4E3B35">Mewly</text>
+</svg>
