@@ -15,7 +15,8 @@ import {
   TrendCard,
   UploadPreview,
 } from "./components";
-import { analyzeCatMedia, behaviorTags, soundTags } from "./analysisEngine";
+import { behaviorTagGroups, sceneOptions, soundBehaviorTags, interactionBehaviorTags } from "./data/catBehaviorKnowledge";
+import { analyzeCatBehavior, analyzeCatMediaWithAI, type CatBehaviorAnalysisResult } from "./lib/analyzeCatBehavior";
 import { generateCatAvatar } from "./avatar";
 import { analyzeHealthRisk } from "./healthRisk";
 import { emptyData, fileToDataUrl, loadData, makeId, nowIso, saveData } from "./storage";
@@ -234,7 +235,7 @@ function LoginPage({ copy, onLogin, onDemo }: { copy: Copy; onLogin: (user: User
 function CatCreatePage({ copy, user, onSave }: { copy: Copy; user: User; onSave: (cat: CatProfile) => void }) {
   const [form, setForm] = useState({
     name: "",
-    gender: "未知" as Gender,
+    gender: "" as Gender | "",
     birthday: "",
     age: "",
     breed: "",
@@ -244,20 +245,23 @@ function CatCreatePage({ copy, user, onSave }: { copy: Copy; user: User; onSave:
     vaccineStatus: "",
     personalityTags: [] as string[],
     habitsText: "",
+    ownerNickname: user.nickname,
+    note: "",
   });
 
   function save(event: FormEvent) {
     event.preventDefault();
-    if (!form.name.trim() || !form.color.trim()) {
-      alert(copy.catCreate.missing);
+    if (!form.name.trim() || !form.gender || !form.breed.trim()) {
+      alert("请先填写猫咪姓名、性别和品种，其他信息可以之后慢慢补。");
       return;
     }
     const cat: CatProfile = {
       id: makeId("cat"),
       userId: user.id,
       ...form,
+      gender: form.gender as Gender,
       habitTags: form.habitsText.split(/[，,。\n]/).map((x) => x.trim()).filter(Boolean).slice(0, 6),
-      ownerNickname: user.nickname,
+      ownerNickname: form.ownerNickname || user.nickname,
       cartoonAvatar: "",
       createdAt: nowIso(),
     };
@@ -271,22 +275,24 @@ function CatCreatePage({ copy, user, onSave }: { copy: Copy; user: User; onSave:
       <div className="form-card">
         <label>猫咪名字<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="咪咪" /></label>
         <div className="field-grid">
-          <label>性别<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as Gender })}><option>未知</option><option>妹妹</option><option>弟弟</option></select></label>
-          <label>生日<input type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} /></label>
+          <label>性别<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as Gender | "" })}><option value="">请选择</option><option>妹妹</option><option>弟弟</option><option>未知</option></select></label>
+          <label>生日 <span className="optional-mark">选填</span><input type="date" value={form.birthday} onChange={(e) => setForm({ ...form, birthday: e.target.value })} /></label>
         </div>
         <div className="field-grid">
-          <label>年龄<input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="2 岁" /></label>
-          <label>体重<input value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} placeholder="4.5kg" /></label>
+          <label>年龄 <span className="optional-mark">选填</span><input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="2 岁" /></label>
+          <label>体重 <span className="optional-mark">选填</span><input value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} placeholder="4.5kg" /></label>
         </div>
         <label>品种<input value={form.breed} onChange={(e) => setForm({ ...form, breed: e.target.value })} placeholder="英短 / 田园猫 / 布偶" /></label>
-        <label>毛色<input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="橘白 / 三花 / 蓝白" /></label>
-        <label>疫苗情况<input value={form.vaccineStatus} onChange={(e) => setForm({ ...form, vaccineStatus: e.target.value })} placeholder="已完成 / 待补打 / 不确定" /></label>
-        <label className="check-line"><input type="checkbox" checked={form.sterilized} onChange={(e) => setForm({ ...form, sterilized: e.target.checked })} /> 是否绝育</label>
+        <label>毛色 <span className="optional-mark">选填</span><input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} placeholder="橘白 / 三花 / 蓝白" /></label>
+        <label>疫苗情况 <span className="optional-mark">选填</span><input value={form.vaccineStatus} onChange={(e) => setForm({ ...form, vaccineStatus: e.target.value })} placeholder="已完成 / 待补打 / 不确定" /></label>
+        <label>主人昵称 <span className="optional-mark">选填</span><input value={form.ownerNickname} onChange={(e) => setForm({ ...form, ownerNickname: e.target.value })} placeholder="铲屎官昵称" /></label>
+        <label className="check-line"><input type="checkbox" checked={form.sterilized} onChange={(e) => setForm({ ...form, sterilized: e.target.checked })} /> 是否绝育 <span className="optional-mark">选填</span></label>
         <section>
-          <h3>性格标签</h3>
+          <h3>性格标签 <span className="optional-mark">选填</span></h3>
           <SegmentedTags options={personalityOptions} value={form.personalityTags} onChange={(personalityTags) => setForm({ ...form, personalityTags })} />
         </section>
-        <label>日常习惯<textarea value={form.habitsText} onChange={(e) => setForm({ ...form, habitsText: e.target.value })} placeholder="吃饭时间、睡觉时间、喜欢的玩具、常见行为..." /></label>
+        <label>日常习惯 <span className="optional-mark">选填</span><textarea value={form.habitsText} onChange={(e) => setForm({ ...form, habitsText: e.target.value })} placeholder="吃饭时间、睡觉时间、喜欢的玩具、常见行为..." /></label>
+        <label>备注 <span className="optional-mark">选填</span><textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="其他想记录的小信息..." /></label>
         <button className="primary-button">{copy.catCreate.submit}</button>
       </div>
     </form>
@@ -336,8 +342,12 @@ function HomePage({ data, go }: { data: AppData; go: (page: Page) => void }) {
 function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; data: AppData; loading: boolean; setLoading: (v: boolean) => void; onSave: (a: MediaAnalysis) => void }) {
   const [preview, setPreview] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [last, setLast] = useState<MediaAnalysis | null>(data.analyses[0] || null);
+  const [sceneTags, setSceneTags] = useState<string[]>([]);
+  const [behaviorTags, setBehaviorTags] = useState<string[]>([]);
+  const [soundTags, setSoundTags] = useState<string[]>([]);
+  const [interactionTags, setInteractionTags] = useState<string[]>([]);
+  const [last, setLast] = useState<CatBehaviorAnalysisResult | null>(null);
+  const latestSaved = data.analyses[0] || null;
 
   async function choose(nextFile: File) {
     setFile(nextFile);
@@ -345,48 +355,138 @@ function InsightPage({ copy, data, loading, setLoading, onSave }: { copy: Copy; 
   }
 
   async function analyze() {
-    if (!file || !preview || tags.length === 0) {
-      alert(copy.insight.missing);
+    const selectedCount = sceneTags.length + behaviorTags.length + soundTags.length + interactionTags.length;
+    if (!file || !preview) {
+      alert("请先上传猫咪照片、视频或音频。上传后再选择你观察到的行为特征。");
+      return;
+    }
+    if (selectedCount === 0) {
+      alert("请至少选择一个场景、行为、声音或互动标签，这样 Mewly 才能推理宝宝想表达什么。");
       return;
     }
     setLoading(true);
     const type: MediaType = file.type.startsWith("video") ? "video" : file.type.startsWith("audio") ? "audio" : "image";
-    const result = await analyzeCatMedia(file, { userId: data.user!.id, catId: data.cat!.id, mediaType: type, fileUrl: preview, tags });
-    const analysis = { ...result, id: makeId("analysis"), createdAt: nowIso() };
+    await analyzeCatMediaWithAI(file);
+    const behaviorResult = analyzeCatBehavior({
+      mediaType: type,
+      sceneTags,
+      behaviorTags,
+      soundTags,
+      interactionTags,
+      catProfile: {
+        name: data.cat?.name,
+        age: data.cat?.age,
+        breed: data.cat?.breed,
+        gender: data.cat?.gender,
+        personalityTags: data.cat?.personalityTags,
+      },
+    });
+    const allSelectedTags = [...sceneTags, ...behaviorTags, ...soundTags, ...interactionTags];
+    const analysis: MediaAnalysis = {
+      id: makeId("analysis"),
+      userId: data.user!.id,
+      catId: data.cat!.id,
+      mediaType: type,
+      fileUrl: preview,
+      selectedBehaviorTags: allSelectedTags,
+      resultMood: behaviorResult.primaryMood,
+      resultIntent: behaviorResult.possibleIntent,
+      confidence: behaviorResult.confidence,
+      reasons: behaviorResult.reasons,
+      suggestions: [...behaviorResult.suggestions, ...behaviorResult.observationTips],
+      riskNotice: behaviorResult.riskNotice,
+      createdAt: nowIso(),
+    };
     window.setTimeout(() => {
-      setLast(analysis);
+      setLast(behaviorResult);
       onSave(analysis);
       setLoading(false);
     }, 450);
   }
 
+  const renderUploadButton = (label: string, accept: string) => (
+    <label className="upload-choice">
+      {label}
+      <input
+        type="file"
+        accept={accept}
+        onChange={(event) => {
+          const nextFile = event.target.files?.[0];
+          if (nextFile) choose(nextFile);
+        }}
+      />
+    </label>
+  );
+
   return (
-    <div className="stack-page">
+    <div className="stack-page insight-page">
       <PageHeader title={copy.insight.title} subtitle={copy.insight.subtitle} />
+      <section className="soft-card">
+        <span className="eyebrow">上传区域</span>
+        <p>上传猫咪照片、视频或音频，Mewly 会帮你分析宝宝现在可能想表达什么。</p>
+        <div className="upload-choice-grid">
+          {renderUploadButton("上传图片", "image/*")}
+          {renderUploadButton("上传视频", "video/*")}
+          {renderUploadButton("上传音频", "audio/*")}
+        </div>
+      </section>
       <UploadPreview accept="image/*,video/*,audio/*" preview={preview} onFile={choose} />
+      {preview ? (
+        <p className="notice">已上传成功。为了让分析更准确，请选择你观察到的猫咪行为特征。当前不会假装自动识别媒体内容。</p>
+      ) : (
+        <EmptyState
+          title="还没有上传猫咪瞬间"
+          text="上传猫咪照片、视频或音频，Mewly 会结合你选择的场景和行为标签做可解释分析。"
+          action={<div className="empty-actions">{renderUploadButton("上传图片", "image/*")}{renderUploadButton("上传视频", "video/*")}{renderUploadButton("上传音频", "audio/*")}</div>}
+        />
+      )}
       <section className="form-card">
         <p className="notice">{copy.insight.uploadingHint}</p>
         <div className="action-strip">
           <span>{copy.insight.upload}</span>
-          <span>{copy.insight.behaviorTags}</span>
+          <span>选择场景</span>
+          <span>选择行为标签</span>
           <span>{copy.insight.start}</span>
         </div>
-        <h3>{copy.insight.behaviorTags}</h3>
-        <SegmentedTags options={behaviorTags} value={tags} onChange={setTags} />
-        <h3>{copy.insight.soundTags}</h3>
-        <SegmentedTags options={soundTags} value={tags} onChange={setTags} />
+        <section className="tag-section">
+          <h3>当前场景</h3>
+          <SegmentedTags options={sceneOptions} value={sceneTags} onChange={setSceneTags} />
+        </section>
+        {behaviorTagGroups.map((group) => {
+          const value = group.title === "声音" ? soundTags : group.title === "互动反应" ? interactionTags : behaviorTags;
+          const onChange = group.title === "声音" ? setSoundTags : group.title === "互动反应" ? setInteractionTags : setBehaviorTags;
+          const options = group.title === "声音" ? soundBehaviorTags : group.title === "互动反应" ? interactionBehaviorTags : group.tags;
+          return (
+            <section className="tag-section" key={group.title}>
+              <h3>{group.title}</h3>
+              <SegmentedTags options={options} value={value} onChange={onChange} />
+            </section>
+          );
+        })}
         <button className="primary-button" disabled={loading} onClick={analyze}>{loading ? "分析中..." : copy.insight.start}</button>
       </section>
       {last && (
         <section className="result-card">
           <span className="eyebrow">{copy.insight.result}</span>
-          <h2>{last.resultMood}</h2>
-          <p>{last.resultIntent} · 置信度 {last.confidence}%</p>
+          <h2>{last.primaryMood}</h2>
+          <p>{last.possibleIntent} · 置信度 {last.confidence}%</p>
+          <p className="result-text">{last.resultText}</p>
+          <h4>命中的行为知识</h4>
+          <ul>{last.matchedRules.map((rule) => <li key={rule}>{rule}</li>)}</ul>
           <h4>{copy.insight.reasons}</h4>
           <ul>{last.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
-          <h4>{copy.insight.suggestions}</h4>
+          <h4>铲屎官可以怎么做</h4>
           <ul>{last.suggestions.map((s) => <li key={s}>{s}</li>)}</ul>
+          <h4>需要继续观察</h4>
+          <ul>{last.observationTips.map((tip) => <li key={tip}>{tip}</li>)}</ul>
           <p className="disclaimer">{last.riskNotice}</p>
+        </section>
+      )}
+      {!last && latestSaved && (
+        <section className="soft-card">
+          <span className="eyebrow">最近一次分析</span>
+          <h3>{latestSaved.resultMood}</h3>
+          <p>{latestSaved.resultIntent} · 置信度 {latestSaved.confidence}%</p>
         </section>
       )}
     </div>

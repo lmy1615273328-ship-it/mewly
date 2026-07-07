@@ -1,3 +1,4 @@
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import type React from "react";
 import type { AlbumItem, CatProfile, ForumPost, HealthRecord, Page, StrayCatReport } from "./types";
 import { HEALTH_DISCLAIMER } from "./types";
@@ -19,11 +20,39 @@ export function Shell({
   const showNav = !["login", "cat-create"].includes(page);
   return (
     <div className="app-shell">
-      <main className={showNav ? "screen with-tabs" : "screen"}>{children}</main>
+      <main className={showNav ? "screen with-tabs" : "screen"}>
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
       {showNav && <BottomNav active={page} onNavigate={onNavigate} copy={copy} />}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
+}
+
+export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; message: string }> {
+  state = { hasError: false, message: "" };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error.message };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Mewly page error", error, info);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <div className="stack-page">
+        <section className="error-card">
+          <h2>页面刚刚打了个小盹</h2>
+          <p>请刷新页面再试一次。如果还出现空白，可以清除本地数据或回到首页。</p>
+          <small>{this.state.message}</small>
+          <button className="primary-button" onClick={() => window.location.reload()}>刷新页面</button>
+        </section>
+      </div>
+    );
+  }
 }
 
 export function PageHeader({
@@ -76,6 +105,7 @@ function BottomNav({ active, onNavigate, copy }: { active: Page; onNavigate: (pa
 }
 
 export function CatCard({ cat, compact = false, status }: { cat: CatProfile; compact?: boolean; status?: string }) {
+  const details = [cat.age || cat.birthday, cat.breed, cat.color, cat.weight].filter(Boolean);
   return (
     <section className={compact ? "cat-card compact-card" : "cat-card"}>
       <div className="avatar-wrap">
@@ -84,17 +114,15 @@ export function CatCard({ cat, compact = false, status }: { cat: CatProfile; com
       <div className="cat-info">
         <span className="chip warm">{cat.gender}</span>
         <h2>{cat.name}</h2>
-        <p>
-          {cat.age || cat.birthday || "年龄待记录"} · {cat.breed || "神秘小猫"} · {cat.color || "柔软毛色"}
-        </p>
+        {!!details.length && <p>{details.join(" · ")}</p>}
         {status && <p className="cat-status">{status}</p>}
-        <div className="tag-row">
-          {cat.personalityTags.slice(0, 4).map((tag) => (
+        {!!cat.personalityTags.length && <div className="tag-row">
+          {cat.personalityTags.filter(Boolean).slice(0, 4).map((tag) => (
             <span className="mini-tag" key={tag}>
               {tag}
             </span>
           ))}
-        </div>
+        </div>}
       </div>
     </section>
   );

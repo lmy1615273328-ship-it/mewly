@@ -66,7 +66,7 @@ video {
 }
 
 .with-tabs {
-  padding-bottom: 104px;
+  padding-bottom: calc(128px + env(safe-area-inset-bottom));
 }
 
 .stack-page {
@@ -257,11 +257,41 @@ video {
   gap: 14px;
 }
 
+.error-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.error-card h2 {
+  margin: 0;
+}
+
+.error-card small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 label {
   display: grid;
   gap: 7px;
   font-weight: 700;
   color: #6f4f43;
+}
+
+.optional-mark {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #fff7ed;
+  color: #9c6b4f;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 input,
@@ -538,6 +568,57 @@ select:focus {
   text-align: center;
   overflow: hidden;
   padding: 12px;
+}
+
+.upload-choice-grid,
+.empty-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.upload-choice {
+  min-height: 52px;
+  border-radius: 18px;
+  background: #fff7ed;
+  border: 1px solid var(--line);
+  color: #8b5735;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-weight: 900;
+  padding: 10px;
+}
+
+.upload-choice input {
+  display: none;
+}
+
+.insight-page {
+  min-height: calc(100vh - 128px);
+}
+
+.tag-section {
+  display: grid;
+  gap: 10px;
+}
+
+.tag-section h3 {
+  margin: 6px 0 0;
+  font-size: 17px;
+}
+
+.result-card {
+  overflow: hidden;
+}
+
+.result-text {
+  border-radius: 18px;
+  background: #fff7ed;
+  padding: 12px;
+  color: #6f4f43;
+  overflow-wrap: anywhere;
 }
 
 .upload-panel input {
@@ -923,6 +1004,11 @@ ul {
 
   .post-actions {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .upload-choice-grid,
+  .empty-actions {
+    grid-template-columns: 1fr;
   }
 }
 

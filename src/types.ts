@@ -30,6 +30,7 @@ export interface CatProfile {
   habitTags: string[];
   habitsText: string;
   ownerNickname: string;
+  note?: string;
   cartoonAvatar: string;
   createdAt: string;
 }
